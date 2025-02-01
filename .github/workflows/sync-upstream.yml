@@ -1,0 +1,36 @@
+name: Sync Upstream Repositories
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'  # Runs every 12 hours
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+
+      - name: Sync with nolly-studio upstream
+        run: |
+          git remote add nolly-upstream https://github.com/nolly-studio/ai-chatbot-supabase.git
+          git fetch nolly-upstream
+          git checkout main
+          git merge nolly-upstream/main --allow-unrelated-histories
+          git push origin main
+
+      - name: Sync with Vercel upstream
+        run: |
+          git remote add vercel-upstream https://github.com/vercel/ai-chatbot.git
+          git fetch vercel-upstream
+          git checkout main
+          git merge vercel-upstream/main --allow-unrelated-histories
+          git push origin main 

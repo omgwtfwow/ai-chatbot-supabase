@@ -16,7 +16,7 @@ import {
   saveChat,
   saveDocument,
   saveMessages,
-  saveSuggestions,
+  saveSuggestion,
   deleteChatById,
 } from '@/db/mutations';
 import { createClient } from '@/lib/supabase/server';
@@ -140,17 +140,29 @@ export async function POST(request: Request) {
     const chat = await getChatById(id);
 
     if (!chat) {
-      const title = await generateTitleFromUserMessage({
-        message: userMessage,
-      });
-      await saveChat({ id, userId: user.id, title });
+      try {
+        const title = await generateTitleFromUserMessage({
+          message: userMessage,
+        });
+        await saveChat({ id, userId: user.id, title });
+      } catch (error) {
+        // If chat creation fails due to duplicate ID, check if the chat belongs to the user
+        if (error instanceof Error && error.message === 'Chat ID already exists') {
+          const existingChat = await getChatById(id);
+          if (!existingChat || existingChat.user_id !== user.id) {
+            return new Response('Unauthorized', { status: 401 });
+          }
+          // If chat exists and belongs to user, continue with message saving
+        } else {
+          throw error; // Re-throw other errors
+        }
+      }
     } else if (chat.user_id !== user.id) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    await saveMessages({
-      chatId: id,
-      messages: [
+    await saveMessages(
+      [
         {
           id: generateUUID(),
           chat_id: id,
@@ -159,7 +171,8 @@ export async function POST(request: Request) {
           created_at: new Date().toISOString(),
         },
       ],
-    });
+      id
+    );
 
     const streamingData = new StreamData();
 
@@ -420,31 +433,22 @@ export async function POST(request: Request) {
               suggestions.push(suggestion);
             }
 
-            if (user && user.id) {
-              const userId = user.id;
-
-              await saveSuggestions({
-                suggestions: suggestions.map((suggestion) => ({
-                  ...suggestion,
-                  userId,
-                  createdAt: new Date(),
-                  documentCreatedAt: document.created_at,
-                })),
-              });
+            if (suggestions && suggestions.length > 0) {
+              const document = await getDocumentById(documentId);
+              if (document) {
+                for (const suggestion of suggestions) {
+                  await saveSuggestion({
+                    id: generateUUID(),
+                    documentId: suggestion.documentId,
+                    documentCreatedAt: document.created_at,
+                    originalText: suggestion.originalText,
+                    suggestedText: suggestion.suggestedText,
+                    description: suggestion.description,
+                    userId: user.id,
+                  });
+                }
+              }
             }
-
-            // if (user && user.id) {
-            //   for (const suggestion of suggestions) {
-            //     await saveSuggestions({
-            //       documentId: suggestion.documentId,
-            //       documentCreatedAt: document.created_at,
-            //       originalText: suggestion.originalText,
-            //       suggestedText: suggestion.suggestedText,
-            //       description: suggestion.description,
-            //       userId: user.id,
-            //     });
-            //   }
-            // }
 
             return {
               id: documentId,
@@ -460,28 +464,27 @@ export async function POST(request: Request) {
             const responseMessagesWithoutIncompleteToolCalls =
               sanitizeResponseMessages(responseMessages);
 
-            await saveMessages({
-              chatId: id,
-              messages: responseMessagesWithoutIncompleteToolCalls.map(
-                (message) => {
-                  const messageId = generateUUID();
+            const formattedMessages = responseMessagesWithoutIncompleteToolCalls.map(
+              (message) => {
+                const messageId = generateUUID();
 
-                  if (message.role === 'assistant') {
-                    streamingData.appendMessageAnnotation({
-                      messageIdFromServer: messageId,
-                    });
-                  }
-
-                  return {
-                    id: messageId,
-                    chat_id: id,
-                    role: message.role as MessageRole,
-                    content: formatMessageContent(message),
-                    created_at: new Date().toISOString(),
-                  };
+                if (message.role === 'assistant') {
+                  streamingData.appendMessageAnnotation({
+                    messageIdFromServer: messageId,
+                  });
                 }
-              ),
-            });
+
+                return {
+                  id: messageId,
+                  chat_id: id,
+                  role: message.role as MessageRole,
+                  content: formatMessageContent(message),
+                  created_at: new Date().toISOString(),
+                };
+              }
+            );
+
+            await saveMessages(formattedMessages, id);
           } catch (error) {
             console.error('Failed to save chat:', error);
           }
@@ -502,9 +505,8 @@ export async function POST(request: Request) {
     console.error('Error in chat route:', error);
     if (error instanceof Error && error.message === 'Chat ID already exists') {
       // If chat already exists, just continue with the message saving
-      await saveMessages({
-        chatId: id,
-        messages: [
+      await saveMessages(
+        [
           {
             id: generateUUID(),
             chat_id: id,
@@ -513,7 +515,8 @@ export async function POST(request: Request) {
             created_at: new Date().toISOString(),
           },
         ],
-      });
+        id
+      );
     } else {
       throw error; // Re-throw other errors
     }

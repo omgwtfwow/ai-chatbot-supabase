@@ -1,5 +1,5 @@
 -- Create updated_at trigger function
-CREATE OR REPLACE FUNCTION public.handle_updated_at()
+CREATE OR REPLACE FUNCTION ai_chat_app_schema.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = TIMEZONE('utc', NOW());
@@ -9,16 +9,16 @@ $$ LANGUAGE plpgsql;
 
 -- Add triggers for updated_at
 CREATE TRIGGER handle_users_updated_at
-    BEFORE UPDATE ON public.users
+    BEFORE UPDATE ON ai_chat_app_schema.users
     FOR EACH ROW
-    EXECUTE FUNCTION public.handle_updated_at();
+    EXECUTE FUNCTION ai_chat_app_schema.handle_updated_at();
 
 CREATE TRIGGER handle_chats_updated_at
-    BEFORE UPDATE ON public.chats
+    BEFORE UPDATE ON ai_chat_app_schema.chats
     FOR EACH ROW
-    EXECUTE FUNCTION public.handle_updated_at();
+    EXECUTE FUNCTION ai_chat_app_schema.handle_updated_at();
 
 CREATE TRIGGER handle_votes_updated_at
-    BEFORE UPDATE ON public.votes
+    BEFORE UPDATE ON ai_chat_app_schema.votes
     FOR EACH ROW
-    EXECUTE FUNCTION public.handle_updated_at(); 
+    EXECUTE FUNCTION ai_chat_app_schema.handle_updated_at(); 

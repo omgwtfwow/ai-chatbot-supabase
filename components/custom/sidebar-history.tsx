@@ -38,7 +38,7 @@ import { getChatsByUserIdQuery } from '@/db/queries';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/lib/supabase/types';
 
-type Chat = Database['public']['Tables']['chats']['Row'];
+type Chat = Database['ai_chat_app_schema']['Tables']['chats']['Row'];
 
 type GroupedChats = {
   today: Chat[];

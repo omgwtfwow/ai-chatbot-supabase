@@ -9,7 +9,7 @@ export type Json =
   | Json[];
 
 export type Database = {
-  public: {
+  ai_chat_app_schema: {
     Tables: {
       chats: {
         Row: {
@@ -355,27 +355,28 @@ export type Database = {
   };
 };
 
-type PublicSchema = Database[Extract<keyof Database, 'public'>];
+type SchemaName = keyof Database;
+type Schema = Database[SchemaName];
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema['Tables'] & PublicSchema['Views'])
+  SchemaNameOrOptions extends
+  | keyof (Schema['Tables'] & Schema['Views'])
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions['schema']]['Tables'] &
-        Database[PublicTableNameOrOptions['schema']]['Views'])
+  TableName extends SchemaNameOrOptions extends { schema: keyof Database }
+  ? keyof (Database[SchemaNameOrOptions['schema']]['Tables'] &
+    Database[SchemaNameOrOptions['schema']]['Views'])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions['schema']]['Tables'] &
-      Database[PublicTableNameOrOptions['schema']]['Views'])[TableName] extends {
+> = SchemaNameOrOptions extends { schema: keyof Database }
+  ? (Database[SchemaNameOrOptions['schema']]['Tables'] &
+    Database[SchemaNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R;
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema['Tables'] &
-        PublicSchema['Views'])
-    ? (PublicSchema['Tables'] &
-        PublicSchema['Views'])[PublicTableNameOrOptions] extends {
+  : SchemaNameOrOptions extends keyof (Schema['Tables'] &
+    Schema['Views'])
+  ? (Schema['Tables'] &
+    Schema['Views'])[SchemaNameOrOptions] extends {
         Row: infer R;
       }
       ? R
@@ -383,20 +384,20 @@ export type Tables<
     : never;
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema['Tables']
+  SchemaNameOrOptions extends
+  | keyof Schema['Tables']
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions['schema']]['Tables']
+  TableName extends SchemaNameOrOptions extends { schema: keyof Database }
+  ? keyof Database[SchemaNameOrOptions['schema']]['Tables']
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions['schema']]['Tables'][TableName] extends {
+> = SchemaNameOrOptions extends { schema: keyof Database }
+  ? Database[SchemaNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I;
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema['Tables']
-    ? PublicSchema['Tables'][PublicTableNameOrOptions] extends {
+  : SchemaNameOrOptions extends keyof Schema['Tables']
+  ? Schema['Tables'][SchemaNameOrOptions] extends {
         Insert: infer I;
       }
       ? I
@@ -515,11 +516,11 @@ export function handleDatabaseError(error: PostgrestError | null) {
 }
 
 // Add Document type
-export type Document = Database['public']['Tables']['documents']['Row'];
-export type Vote = Database['public']['Tables']['votes']['Row'];
-export type Chat = Database['public']['Tables']['chats']['Row'];
-
-export type Suggestion = Database['public']['Tables']['suggestions']['Row'];
+export type Document = Database['ai_chat_app_schema']['Tables']['documents']['Row'];
+export type Vote = Database['ai_chat_app_schema']['Tables']['votes']['Row'];
+export type Chat = Database['ai_chat_app_schema']['Tables']['chats']['Row'];
+export type Message = Database['ai_chat_app_schema']['Tables']['messages']['Row'];
+export type Suggestion = Database['ai_chat_app_schema']['Tables']['suggestions']['Row'];
 
 // Add DatabaseMessage type to match the database schema
 export interface DatabaseMessage {

@@ -18,7 +18,7 @@ import { BlockStreamHandler } from './block-stream-handler';
 import { MultimodalInput } from './multimodal-input';
 import { Overview } from './overview';
 
-type Vote = Database['public']['Tables']['votes']['Row'];
+type Vote = Database['ai_chat_app_schema']['Tables']['votes']['Row'];
 
 export function Chat({
   id,

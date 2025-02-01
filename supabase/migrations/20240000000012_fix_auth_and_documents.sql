@@ -1,35 +1,35 @@
 -- First, let's fix the documents table to handle updates better
-ALTER TABLE public.documents 
+ALTER TABLE ai_chat_app_schema.documents 
 DROP CONSTRAINT IF EXISTS documents_pkey CASCADE;
 
 -- Recreate primary key with a more robust structure
-ALTER TABLE public.documents
+ALTER TABLE ai_chat_app_schema.documents
 ADD CONSTRAINT documents_pkey 
 PRIMARY KEY (id, created_at);
 
 -- Create function to get latest version
-CREATE OR REPLACE FUNCTION get_document_latest_version(doc_id UUID)
+CREATE OR REPLACE FUNCTION ai_chat_app_schema.get_document_latest_version(doc_id UUID)
 RETURNS TIMESTAMPTZ AS $$
 BEGIN
     RETURN (
         SELECT MAX(created_at)
-        FROM public.documents
+        FROM ai_chat_app_schema.documents
         WHERE id = doc_id
     );
 END;
 $$ LANGUAGE plpgsql;
 
 -- Create function to handle document versioning
-CREATE OR REPLACE FUNCTION handle_document_version()
+CREATE OR REPLACE FUNCTION ai_chat_app_schema.handle_document_version()
 RETURNS TRIGGER AS $$
 BEGIN
     -- If this is an update to an existing document
     IF EXISTS (
-        SELECT 1 FROM public.documents 
+        SELECT 1 FROM ai_chat_app_schema.documents 
         WHERE id = NEW.id AND user_id = NEW.user_id
     ) THEN
         -- Insert as a new version instead of updating
-        INSERT INTO public.documents (
+        INSERT INTO ai_chat_app_schema.documents (
             id,
             user_id,
             title,
@@ -49,38 +49,38 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger for document versioning
-DROP TRIGGER IF EXISTS document_version_trigger ON public.documents;
+DROP TRIGGER IF EXISTS document_version_trigger ON ai_chat_app_schema.documents;
 CREATE TRIGGER document_version_trigger
-    BEFORE UPDATE ON public.documents
+    BEFORE UPDATE ON ai_chat_app_schema.documents
     FOR EACH ROW
-    EXECUTE FUNCTION handle_document_version();
+    EXECUTE FUNCTION ai_chat_app_schema.handle_document_version();
 
 -- Add RLS policies to ensure proper access
-ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_chat_app_schema.documents ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can insert their own documents" ON public.documents;
+DROP POLICY IF EXISTS "Users can insert their own documents" ON ai_chat_app_schema.documents;
 CREATE POLICY "Users can insert their own documents"
-    ON public.documents
+    ON ai_chat_app_schema.documents
     FOR INSERT
     TO authenticated
     WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can view their own documents" ON public.documents;
+DROP POLICY IF EXISTS "Users can view their own documents" ON ai_chat_app_schema.documents;
 CREATE POLICY "Users can view their own documents"
-    ON public.documents
+    ON ai_chat_app_schema.documents
     FOR SELECT
     TO authenticated
     USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can update their own documents" ON public.documents;
+DROP POLICY IF EXISTS "Users can update their own documents" ON ai_chat_app_schema.documents;
 CREATE POLICY "Users can update their own documents"
-    ON public.documents
+    ON ai_chat_app_schema.documents
     FOR UPDATE
     TO authenticated
     USING (auth.uid() = user_id);
 
 -- Add function to get latest document version
-CREATE OR REPLACE FUNCTION get_latest_document(doc_id UUID, auth_user_id UUID)
+CREATE OR REPLACE FUNCTION ai_chat_app_schema.get_latest_document(doc_id UUID, auth_user_id UUID)
 RETURNS TABLE (
     id UUID,
     user_id UUID,
@@ -91,10 +91,10 @@ RETURNS TABLE (
 BEGIN
     RETURN QUERY
     SELECT d.id, d.user_id, d.title, d.content, d.created_at
-    FROM public.documents d
+    FROM ai_chat_app_schema.documents d
     WHERE d.id = doc_id
     AND d.user_id = auth_user_id
-    AND d.created_at = get_document_latest_version(d.id);
+    AND d.created_at = ai_chat_app_schema.get_document_latest_version(d.id);
 END;
 $$ LANGUAGE plpgsql
 SECURITY DEFINER;
@@ -103,19 +103,19 @@ SECURITY DEFINER;
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_documents_user_id') THEN
-        CREATE INDEX idx_documents_user_id ON public.documents(user_id);
+        CREATE INDEX idx_documents_user_id ON ai_chat_app_schema.documents(user_id);
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_documents_created_at') THEN
-        CREATE INDEX idx_documents_created_at ON public.documents(created_at);
+        CREATE INDEX idx_documents_created_at ON ai_chat_app_schema.documents(created_at);
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_documents_latest_version') THEN
         CREATE UNIQUE INDEX idx_documents_latest_version 
-        ON public.documents(id, user_id, created_at DESC);
+        ON ai_chat_app_schema.documents(id, user_id, created_at DESC);
     END IF;
 END $$;
 
 -- Grant necessary permissions
-GRANT EXECUTE ON FUNCTION get_latest_document TO authenticated;
-GRANT EXECUTE ON FUNCTION get_document_latest_version TO authenticated; 
+GRANT EXECUTE ON FUNCTION ai_chat_app_schema.get_latest_document TO authenticated;
+GRANT EXECUTE ON FUNCTION ai_chat_app_schema.get_document_latest_version TO authenticated; 

@@ -11,8 +11,8 @@ import { twMerge } from 'tailwind-merge';
 
 import type { Database } from '@/lib/supabase/types';
 
-type DBMessage = Database['public']['Tables']['messages']['Row'];
-type Document = Database['public']['Tables']['documents']['Row'];
+type DBMessage = Database['ai_chat_app_schema']['Tables']['messages']['Row'];
+type Document = Database['ai_chat_app_schema']['Tables']['documents']['Row'];
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

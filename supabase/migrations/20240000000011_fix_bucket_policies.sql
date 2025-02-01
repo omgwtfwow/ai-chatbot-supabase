@@ -18,7 +18,22 @@ TO authenticated
 USING (true)
 WITH CHECK (true);
 
--- Drop any existing object policies to start fresh
+-- Create or update the storage bucket with unique name
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'ai_chat_app_storage',
+    'ai_chat_app_storage',
+    true,
+    52428800, -- 50MB
+    ARRAY['image/*', 'application/pdf']::text[]
+)
+ON CONFLICT (id) DO UPDATE
+SET 
+    public = true,
+    file_size_limit = 52428800,
+    allowed_mime_types = ARRAY['image/*', 'application/pdf']::text[];
+
+-- Drop any existing object policies for this bucket
 DO $$
 BEGIN
     DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
@@ -28,60 +43,30 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
--- Create new object policies
-CREATE POLICY "Allow authenticated uploads"
-ON storage.objects
-FOR INSERT
-TO authenticated
+-- Create bucket-specific policies
+CREATE POLICY "Allow authenticated uploads to ai_chat_app"
+ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (
-    bucket_id = 'chat_attachments'
+    bucket_id = 'ai_chat_app_storage'
 );
 
-CREATE POLICY "Allow authenticated updates"
-ON storage.objects
-FOR UPDATE
-TO authenticated
+CREATE POLICY "Allow authenticated updates to ai_chat_app"
+ON storage.objects FOR UPDATE TO authenticated
 USING (
-    bucket_id = 'chat_attachments'
+    bucket_id = 'ai_chat_app_storage'
     AND (auth.uid() = (storage.foldername(name))[1]::uuid)
 );
 
-CREATE POLICY "Allow authenticated deletes"
-ON storage.objects
-FOR DELETE
-TO authenticated
+CREATE POLICY "Allow authenticated deletes from ai_chat_app"
+ON storage.objects FOR DELETE TO authenticated
 USING (
-    bucket_id = 'chat_attachments'
+    bucket_id = 'ai_chat_app_storage'
     AND (auth.uid() = (storage.foldername(name))[1]::uuid)
 );
 
-CREATE POLICY "Allow public downloads"
-ON storage.objects
-FOR SELECT
-TO public
-USING (bucket_id = 'chat_attachments');
-
--- Ensure bucket exists with correct settings
-DO $$
-BEGIN
-    UPDATE storage.buckets 
-    SET 
-        public = true,
-        file_size_limit = 52428800,
-        allowed_mime_types = ARRAY['image/*', 'application/pdf']::text[]
-    WHERE id = 'chat_attachments';
-    
-    IF NOT FOUND THEN
-        INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-        VALUES (
-            'chat_attachments',
-            'chat_attachments',
-            true,
-            52428800,
-            ARRAY['image/*', 'application/pdf']::text[]
-        );
-    END IF;
-END $$;
+CREATE POLICY "Allow public downloads from ai_chat_app"
+ON storage.objects FOR SELECT TO public
+USING (bucket_id = 'ai_chat_app_storage');
 
 -- Ensure proper permissions are granted
 GRANT ALL ON storage.objects TO authenticated;
