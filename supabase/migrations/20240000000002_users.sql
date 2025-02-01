@@ -1,5 +1,5 @@
 -- Create Users table
-CREATE TABLE IF NOT EXISTS public.users (
+CREATE TABLE IF NOT EXISTS ai_chat_app_schema.users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(64) NOT NULL UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
@@ -7,20 +7,20 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 -- Enable Row Level Security
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_chat_app_schema.users ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS Policies
-CREATE POLICY "Users can view own profile" ON public.users
+CREATE POLICY "Users can view own profile" ON ai_chat_app_schema.users
     FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "Users can update own profile" ON public.users
+CREATE POLICY "Users can update own profile" ON ai_chat_app_schema.users
     FOR UPDATE USING (auth.uid() = id); 
 
-    -- Create a trigger to automatically create user records
-CREATE OR REPLACE FUNCTION public.handle_new_user()
+-- Create a trigger to automatically create user records
+CREATE OR REPLACE FUNCTION ai_chat_app_schema.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.users (id, email, created_at, updated_at)
+  INSERT INTO ai_chat_app_schema.users (id, email, created_at, updated_at)
   VALUES (
     NEW.id,
     NEW.email,
@@ -42,10 +42,10 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT OR UPDATE ON auth.users
   FOR EACH ROW
-  EXECUTE FUNCTION public.handle_new_user();
+  EXECUTE FUNCTION ai_chat_app_schema.handle_new_user();
 
 -- Backfill existing users
-INSERT INTO public.users (id, email, created_at, updated_at)
+INSERT INTO ai_chat_app_schema.users (id, email, created_at, updated_at)
 SELECT 
   id,
   email,

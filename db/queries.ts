@@ -1,7 +1,7 @@
 import { AuthError } from '@supabase/supabase-js';
 import type { Client, Database } from '../lib/supabase/types';
 
-type Tables = Database['public']['Tables'];
+type Tables = Database['ai_chat_app_schema']['Tables'];
 
 export async function getSessionQuery(client: Client) {
   const {
