@@ -169,11 +169,25 @@ export function MultimodalInput({
   const handleFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
 
       setUploadQueue(files.map((file) => file.name));
 
       try {
-        const uploadPromises = files.map((file) => uploadFile(file, chatId));
+        const uploadPromises = files.map(async (file) => {
+          try {
+            const attachment = await uploadFile(file, chatId);
+            if (attachment) {
+              setUploadQueue(current => current.filter(name => name !== file.name));
+              return attachment;
+            }
+          } catch (error) {
+            console.error(`Error uploading ${file.name}:`, error);
+            setUploadQueue(current => current.filter(name => name !== file.name));
+            toast.error(`Failed to upload ${file.name}`);
+          }
+        });
+
         const uploadedAttachments = await Promise.all(uploadPromises);
         const successfullyUploadedAttachments = uploadedAttachments.filter(
           (attachment): attachment is NonNullable<typeof attachment> =>
@@ -189,6 +203,9 @@ export function MultimodalInput({
         toast.error('Failed to upload one or more files');
       } finally {
         setUploadQueue([]);
+        if (event.target) {
+          event.target.value = '';
+        }
       }
     },
     [setAttachments, chatId]

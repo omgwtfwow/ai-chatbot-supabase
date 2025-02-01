@@ -16,7 +16,7 @@ import {
   saveChat,
   saveDocument,
   saveMessages,
-  saveSuggestions,
+  saveSuggestion,
   deleteChatById,
 } from '@/db/mutations';
 import { createClient } from '@/lib/supabase/server';
@@ -143,7 +143,16 @@ export async function POST(request: Request) {
       const title = await generateTitleFromUserMessage({
         message: userMessage,
       });
-      await saveChat({ id, userId: user.id, title });
+      try {
+        await saveChat({ id, userId: user.id, title });
+      } catch (chatError: any) {
+        // If chat already exists, that's fine - we can continue
+        if (chatError.message === 'Chat ID already exists') {
+          console.log('Chat already exists, continuing with message...');
+        } else {
+          throw chatError;
+        }
+      }
     } else if (chat.user_id !== user.id) {
       return new Response('Unauthorized', { status: 401 });
     }
@@ -423,7 +432,7 @@ export async function POST(request: Request) {
             if (user && user.id) {
               const userId = user.id;
 
-              await saveSuggestions({
+              await saveSuggestion({
                 suggestions: suggestions.map((suggestion) => ({
                   ...suggestion,
                   userId,
@@ -500,23 +509,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Error in chat route:', error);
-    if (error instanceof Error && error.message === 'Chat ID already exists') {
-      // If chat already exists, just continue with the message saving
-      await saveMessages({
-        chatId: id,
-        messages: [
-          {
-            id: generateUUID(),
-            chat_id: id,
-            role: userMessage.role as MessageRole,
-            content: formatMessageContent(userMessage),
-            created_at: new Date().toISOString(),
-          },
-        ],
-      });
-    } else {
-      throw error; // Re-throw other errors
-    }
+    return new Response('Internal Server Error', { status: 500 });
   }
 }
 

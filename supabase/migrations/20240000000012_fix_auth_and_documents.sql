@@ -58,26 +58,42 @@ CREATE TRIGGER document_version_trigger
 -- Add RLS policies to ensure proper access
 ALTER TABLE ai_chat_app_schema.documents ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can insert their own documents" ON ai_chat_app_schema.documents;
-CREATE POLICY "Users can insert their own documents"
-    ON ai_chat_app_schema.documents
-    FOR INSERT
-    TO authenticated
-    WITH CHECK (auth.uid() = user_id);
+-- Drop all existing policies first
+DO $$ 
+BEGIN
+    -- Drop document policies
+    DROP POLICY IF EXISTS "Users can view own documents" ON ai_chat_app_schema.documents;
+    DROP POLICY IF EXISTS "Users can create own documents" ON ai_chat_app_schema.documents;
+    DROP POLICY IF EXISTS "Users can update own documents" ON ai_chat_app_schema.documents;
+    DROP POLICY IF EXISTS "Users can delete own documents" ON ai_chat_app_schema.documents;
+    DROP POLICY IF EXISTS "Users can insert their own documents" ON ai_chat_app_schema.documents;
+    DROP POLICY IF EXISTS "Users can view their own documents" ON ai_chat_app_schema.documents;
+    DROP POLICY IF EXISTS "Users can update their own documents" ON ai_chat_app_schema.documents;
 
-DROP POLICY IF EXISTS "Users can view their own documents" ON ai_chat_app_schema.documents;
-CREATE POLICY "Users can view their own documents"
-    ON ai_chat_app_schema.documents
-    FOR SELECT
-    TO authenticated
-    USING (auth.uid() = user_id);
+    -- Drop chat policies
+    DROP POLICY IF EXISTS "Users can view own chats" ON ai_chat_app_schema.chats;
+    DROP POLICY IF EXISTS "Users can create own chats" ON ai_chat_app_schema.chats;
+    DROP POLICY IF EXISTS "Users can update own chats" ON ai_chat_app_schema.chats;
+    DROP POLICY IF EXISTS "Users can delete own chats" ON ai_chat_app_schema.chats;
 
-DROP POLICY IF EXISTS "Users can update their own documents" ON ai_chat_app_schema.documents;
-CREATE POLICY "Users can update their own documents"
-    ON ai_chat_app_schema.documents
-    FOR UPDATE
-    TO authenticated
-    USING (auth.uid() = user_id);
+    -- Drop message policies
+    DROP POLICY IF EXISTS "Users can view messages from their chats" ON ai_chat_app_schema.messages;
+    DROP POLICY IF EXISTS "Users can create messages in their chats" ON ai_chat_app_schema.messages;
+    DROP POLICY IF EXISTS "Users can update messages in their chats" ON ai_chat_app_schema.messages;
+    DROP POLICY IF EXISTS "Users can delete messages from their chats" ON ai_chat_app_schema.messages;
+
+    -- Drop vote policies
+    DROP POLICY IF EXISTS "Users can view votes from their chats" ON ai_chat_app_schema.votes;
+    DROP POLICY IF EXISTS "Users can create votes in their chats" ON ai_chat_app_schema.votes;
+    DROP POLICY IF EXISTS "Users can update votes in their chats" ON ai_chat_app_schema.votes;
+    DROP POLICY IF EXISTS "Users can delete votes from their chats" ON ai_chat_app_schema.votes;
+
+    -- Drop suggestion policies
+    DROP POLICY IF EXISTS "Users can view own suggestions" ON ai_chat_app_schema.suggestions;
+    DROP POLICY IF EXISTS "Users can create own suggestions" ON ai_chat_app_schema.suggestions;
+    DROP POLICY IF EXISTS "Users can update own suggestions" ON ai_chat_app_schema.suggestions;
+    DROP POLICY IF EXISTS "Users can delete own suggestions" ON ai_chat_app_schema.suggestions;
+END $$;
 
 -- Add function to get latest document version
 CREATE OR REPLACE FUNCTION ai_chat_app_schema.get_latest_document(doc_id UUID, auth_user_id UUID)
@@ -118,4 +134,171 @@ END $$;
 
 -- Grant necessary permissions
 GRANT EXECUTE ON FUNCTION ai_chat_app_schema.get_latest_document TO authenticated;
-GRANT EXECUTE ON FUNCTION ai_chat_app_schema.get_document_latest_version TO authenticated; 
+GRANT EXECUTE ON FUNCTION ai_chat_app_schema.get_document_latest_version TO authenticated;
+
+-- Enable RLS for all tables with error handling
+DO $$ 
+BEGIN
+    ALTER TABLE ai_chat_app_schema.documents ENABLE ROW LEVEL SECURITY;
+EXCEPTION 
+    WHEN others THEN null;
+END $$;
+
+DO $$ 
+BEGIN
+    ALTER TABLE ai_chat_app_schema.chats ENABLE ROW LEVEL SECURITY;
+EXCEPTION 
+    WHEN others THEN null;
+END $$;
+
+DO $$ 
+BEGIN
+    ALTER TABLE ai_chat_app_schema.messages ENABLE ROW LEVEL SECURITY;
+EXCEPTION 
+    WHEN others THEN null;
+END $$;
+
+DO $$ 
+BEGIN
+    ALTER TABLE ai_chat_app_schema.votes ENABLE ROW LEVEL SECURITY;
+EXCEPTION 
+    WHEN others THEN null;
+END $$;
+
+DO $$ 
+BEGIN
+    ALTER TABLE ai_chat_app_schema.suggestions ENABLE ROW LEVEL SECURITY;
+EXCEPTION 
+    WHEN others THEN null;
+END $$;
+
+-- Grant permissions with error handling
+DO $$ 
+BEGIN
+    GRANT USAGE ON SCHEMA ai_chat_app_schema TO authenticated;
+    GRANT ALL ON ALL TABLES IN SCHEMA ai_chat_app_schema TO authenticated;
+    GRANT ALL ON ALL SEQUENCES IN SCHEMA ai_chat_app_schema TO authenticated;
+EXCEPTION 
+    WHEN others THEN null;
+END $$;
+
+DO $$ 
+BEGIN
+    GRANT USAGE ON SCHEMA ai_chat_app_schema TO anon;
+    GRANT SELECT ON ALL TABLES IN SCHEMA ai_chat_app_schema TO anon;
+EXCEPTION 
+    WHEN others THEN null;
+END $$;
+
+-- Documents policies
+CREATE POLICY "Users can view own documents" ON ai_chat_app_schema.documents
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own documents" ON ai_chat_app_schema.documents
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own documents" ON ai_chat_app_schema.documents
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own documents" ON ai_chat_app_schema.documents
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Chats policies
+CREATE POLICY "Users can view own chats" ON ai_chat_app_schema.chats
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own chats" ON ai_chat_app_schema.chats
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own chats" ON ai_chat_app_schema.chats
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own chats" ON ai_chat_app_schema.chats
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Messages policies
+CREATE POLICY "Users can view messages from their chats" ON ai_chat_app_schema.messages
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM ai_chat_app_schema.chats
+            WHERE chats.id = messages.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can create messages in their chats" ON ai_chat_app_schema.messages
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM ai_chat_app_schema.chats
+            WHERE chats.id = messages.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update messages in their chats" ON ai_chat_app_schema.messages
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM ai_chat_app_schema.chats
+            WHERE chats.id = messages.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can delete messages from their chats" ON ai_chat_app_schema.messages
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM ai_chat_app_schema.chats
+            WHERE chats.id = messages.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+-- Votes policies
+CREATE POLICY "Users can view votes from their chats" ON ai_chat_app_schema.votes
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM ai_chat_app_schema.chats
+            WHERE chats.id = votes.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can create votes in their chats" ON ai_chat_app_schema.votes
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM ai_chat_app_schema.chats
+            WHERE chats.id = votes.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update votes in their chats" ON ai_chat_app_schema.votes
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM ai_chat_app_schema.chats
+            WHERE chats.id = votes.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can delete votes from their chats" ON ai_chat_app_schema.votes
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM ai_chat_app_schema.chats
+            WHERE chats.id = votes.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+-- Suggestions policies
+CREATE POLICY "Users can view own suggestions" ON ai_chat_app_schema.suggestions
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own suggestions" ON ai_chat_app_schema.suggestions
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own suggestions" ON ai_chat_app_schema.suggestions
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own suggestions" ON ai_chat_app_schema.suggestions
+    FOR DELETE USING (auth.uid() = user_id); 

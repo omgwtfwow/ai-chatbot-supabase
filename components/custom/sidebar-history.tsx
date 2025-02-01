@@ -38,7 +38,7 @@ import { getChatsByUserIdQuery } from '@/db/queries';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/lib/supabase/types';
 
-type Chat = Database['public']['Tables']['chats']['Row'];
+type Chat = Database['ai_chat_app_schema']['Tables']['chats']['Row'];
 
 type GroupedChats = {
   today: Chat[];
@@ -48,34 +48,43 @@ type GroupedChats = {
   older: Chat[];
 };
 
-const fetcher = async (): Promise<Chat[]> => {
+const fetcher = async ([_, userId]: [string, string]): Promise<Chat[]> => {
+  if (!userId) {
+    throw new Error('User ID is required');
+  }
+
   try {
     const supabase = createClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error('Auth error:', userError);
-      return [];
-    }
 
     const { data: chats, error: chatsError } = await supabase
+      .schema('ai_chat_app_schema')
       .from('chats')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (chatsError) {
-      console.error('Chats fetch error:', chatsError);
+      console.error('Chats fetch error:', {
+        message: chatsError.message,
+        details: chatsError.details,
+        hint: chatsError.hint,
+        code: chatsError.code
+      });
+      throw new Error(`Failed to fetch chats: ${chatsError.message}`);
+    }
+
+    if (!chats) {
       return [];
     }
 
-    return chats || [];
+    return chats;
   } catch (error) {
-    console.error('Fetcher error:', error);
-    return [];
+    console.error('Fetcher error:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    throw error;
   }
 };
 
@@ -126,12 +135,27 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   const {
     data: history,
     isLoading,
+    error,
     mutate,
-  } = useSWR<Chat[]>(user ? ['chats', user.id] : null, fetcher, {
-    fallbackData: [],
-    refreshInterval: 5000, // Optional: refresh every 5 seconds
-    revalidateOnFocus: true,
-  });
+  } = useSWR<Chat[]>(
+    user?.id ? ['chats', user.id] : null,
+    fetcher,
+    {
+      fallbackData: [],
+      refreshInterval: 5000,
+      revalidateOnFocus: true,
+      onError: (err) => {
+        console.error('SWR Error:', {
+          message: err instanceof Error ? err.message : 'Unknown error',
+          name: err instanceof Error ? err.name : 'Unknown',
+          stack: err instanceof Error ? err.stack : undefined
+        });
+        toast.error('Failed to load chats');
+      },
+      shouldRetryOnError: true,
+      errorRetryCount: 3
+    }
+  );
 
   useEffect(() => {
     mutate();

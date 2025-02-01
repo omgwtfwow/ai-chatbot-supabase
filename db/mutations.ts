@@ -77,15 +77,19 @@ export async function deleteChatById(chatId: string, userId: string) {
   );
 }
 
-export async function saveMessages(
-  messages: Array<Message>,
-  chatId: string
-) {
+export async function saveMessages({
+  chatId,
+  messages,
+}: {
+  chatId: string;
+  messages: Message | Message[];
+}) {
   await mutateQuery(
     async (client) => {
+      const messageArray = Array.isArray(messages) ? messages : [messages];
       const { error } = await client
         .from('messages')
-        .insert(messages.map(message => ({
+        .insert(messageArray.map(message => ({
           id: message.id,
           chat_id: chatId,
           role: message.role,
@@ -110,7 +114,7 @@ export async function saveVote(vote: VoteInsert, chatId: string) {
             chat_id: chatId,
           },
           {
-            onConflict: 'chat_id',
+            onConflict: 'message_id'
           }
         );
       if (updateError) throw updateError;

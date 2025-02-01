@@ -18,7 +18,7 @@ import { BlockStreamHandler } from './block-stream-handler';
 import { MultimodalInput } from './multimodal-input';
 import { Overview } from './overview';
 
-type Vote = Database['public']['Tables']['votes']['Row'];
+type Vote = Database['ai_chat_app_schema']['Tables']['votes']['Row'];
 
 export function Chat({
   id,
@@ -67,8 +67,13 @@ export function Chat({
   });
 
   const { data: votes } = useSWR<Array<Vote>>(
-    `/api/vote?chatId=${id}`,
-    fetcher
+    id ? `/api/vote?chatId=${id}` : null,
+    fetcher,
+    {
+      refreshInterval: 0,
+      revalidateOnFocus: false,
+      dedupingInterval: 5000
+    }
   );
 
   const [messagesContainerRef, messagesEndRef] =

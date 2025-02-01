@@ -1,5 +1,5 @@
 import { getSession } from '@/db/cached-queries';
-import { voteMessage } from '@/db/mutations';
+import { saveVote } from '@/db/mutations';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    await voteMessage({ chatId, messageId, type });
+    await saveVote({ message_id: messageId, is_upvoted: type === 'up' }, chatId);
 
     return new Response('Vote recorded', { status: 200 });
   } catch (error) {
@@ -65,11 +65,7 @@ export async function PATCH(request: Request) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    await voteMessage({
-      chatId,
-      messageId,
-      type: type,
-    });
+    await saveVote({ message_id: messageId, is_upvoted: type === 'up' }, chatId);
 
     return new Response('Message voted', { status: 200 });
   } catch (error) {

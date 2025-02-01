@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 
+import { getChatById } from '@/db/cached-queries';
+import { saveChat } from '@/db/mutations';
 import { upload } from '@/db/storage';
 import { createClient } from '@/lib/supabase/server';
+import { generateUUID } from '@/lib/utils';
 
 import type { Database } from '@/lib/supabase/types';
 
@@ -48,6 +51,28 @@ export async function POST(req: Request) {
 
     if (!user) {
       console.error('Authentication failed:', authError);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if chat exists and create it if it doesn't
+    const chat = await getChatById(chatId);
+    if (!chat) {
+      console.log('Creating chat for file upload...');
+      try {
+        await saveChat({
+          id: chatId,
+          userId: user.id,
+          title: `Chat with ${file.name}`,
+        });
+      } catch (chatError: any) {
+        // If chat already exists, that's fine - we can continue
+        if (chatError.message === 'Chat ID already exists') {
+          console.log('Chat already exists, continuing with upload...');
+        } else {
+          throw chatError;
+        }
+      }
+    } else if (chat.user_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -162,11 +187,6 @@ export async function POST(req: Request) {
       if (uploadError.message?.includes('row-level security')) {
         // Log RLS details
         console.error('RLS policy violation. Current user:', user);
-        const { data: policies } = await supabase
-          .from('postgres_policies')
-          .select('*')
-          .eq('table', 'storage.objects');
-        console.log('Current storage policies:', policies);
       }
 
       return NextResponse.json(

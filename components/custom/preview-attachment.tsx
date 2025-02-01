@@ -5,35 +5,33 @@ import { LoaderIcon } from './icons';
 export const PreviewAttachment = ({
   attachment,
   isUploading = false,
+  onRemove,
 }: {
   attachment: Attachment;
   isUploading?: boolean;
+  onRemove?: () => void;
 }) => {
   const { name, url, contentType } = attachment;
 
   return (
     <div className="flex flex-col gap-2">
       <div className="w-20 aspect-video bg-muted rounded-md relative flex flex-col items-center justify-center">
-        {contentType ? (
-          contentType.startsWith('image') ? (
-            // NOTE: it is recommended to use next/image for images
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={url}
-              src={url}
-              alt={name ?? 'An image attachment'}
-              className="rounded-md size-full object-cover"
-            />
-          ) : (
-            <div className=""></div>
-          )
-        ) : (
-          <div className=""></div>
+        {!isUploading && contentType?.startsWith('image') && (
+          // NOTE: it is recommended to use next/image for images
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={url}
+            src={url}
+            alt={name ?? 'An image attachment'}
+            className="rounded-md size-full object-cover"
+          />
         )}
 
         {isUploading && (
-          <div className="animate-spin absolute text-zinc-500">
-            <LoaderIcon />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="animate-spin text-zinc-500">
+              <LoaderIcon />
+            </div>
           </div>
         )}
       </div>
